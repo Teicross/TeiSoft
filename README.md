@@ -1,107 +1,77 @@
-# AI Micro-Tasking Transaction Pipeline Project
+# AI Micro-Tasking Transaction Pipeline
 
-สถาปัตยกรรม Multi-Agent สำหรับการบริหารจัดการคิวงานและระบบ CI/CD บน Codex Platform ที่ออกแบบมาเพื่อควบคุมความปลอดภัยในการแก้ไขซอร์สโค้ด โดยการซอยแผนงานใหญ่ (Implementation Plan) ให้เป็นธุรกรรมย่อย (Atomic Micro-Transactions) และป้องกันไม่ให้ AI แก้ไขโค้ดเกินขอบเขตที่กำหนด
+ระบบนี้เป็นตัวช่วยจัดการ Workflow และท่อ CI/CD บน Codex Platform ที่เราออกแบบมาเพื่อแก้ปัญหาใหญ่เวลาปล่อยให้ AI แก้โค้ด นั่นคือการ "แอบแก้ลาม" จนระบบพัง 
 
----
-
-## 1. 📁 Project Structure
-
-```text
-📁โปรเจกต์ของคุณ/
-├── 📁 .codex/
-│   └── 📁 prompts/
-│       ├── orchestrator.md   # คู่มือกฎเหล็กและกลไกสลับทรานแซกชัน [Orchestrator]
-│       ├── coder.md          # กรอบการเขียนโค้ดเฉพาะจุดแบบปิด [Coder]
-│       ├── reviewer.md       # วิธีการสแกนความปลอดภัยและ Logic Gate [Reviewer]
-│       └── devops.md         # คำสั่งควบคุม Git CLI และการซิงค์บอร์ด Pipeline [DevOps]
-└── codex-workflow.yaml       # ไฟล์ควบคุมท่อวิ่งงานและการสลับ Model ราย Agent
-```
+หลักการทำงานของระบบนี้คือการใช้ทีม AI Agent หลายตัว (Multi-Agent) มาช่วยกันรันงาน โดยจะบังคับหั่นแผนงานใหญ่ (Implementation Plan) ให้กลายเป็นงานย่อยชิ้นเล็กๆ ที่เรียกว่า Atomic Micro-Transactions เพื่อจำกัดขอบเขตไม่ให้ AI ตัวเขียนโค้ดสามารถเข้าไปแก้ไขอะไรนอกเหนือจากที่สั่งได้เลย ระบบจะปลอดภัยและควบคุมง่ายขึ้นมากครับ
 
 ---
 
-## 2. ⚙️ Heterogeneous Model Selection (Model-to-Task Matching)
+## 01 / PROJECT STRUCTURE
 
-เพื่อประสิทธิภาพสูงสุดและลดต้นทุน ทรานแซกชันนี้ทำการจัดสรรทรัพยากรประมวลผลแยกตามความซับซ้อนของแต่ละเอเจนท์:
+โครงสร้างโฟลเดอร์ของโปรเจกต์นี้จะแบ่งหน้าที่ของ Agent แต่ละตัวออกจากกันอย่างชัดเจนตามนี้ครับ
+
+<pre>
+project-root/
+├── .codex/
+│   └── prompts/
+│       ├── orchestrator.md   # [Orchestrator] พี่ใหญ่คุมกฎ คอยหั่นงานและสลับทรานแซกชัน
+│       ├── developer.md          # [developer] ช่างเขียนโค้ดเฉพาะจุด ทำงานในกรอบปิด
+│       ├── reviewer.md       # [Reviewer] หน่วยตรวจโค้ด สแกนบั๊กและความปลอดภัยก่อนให้ผ่าน
+│       └── devops.md         # [DevOps] เด็กคุมท่อ รันพวก Git CLI และเลื่อนการ์ดบนบอร์ด
+└── codex-workflow.yaml       # ไฟล์หลักที่ใช้คุม Workflow และคอยแจกจ่ายงานให้แต่ละโมเดล
+</pre>
+
+---
+
+## 02 / MODEL-TO-TASK MATCHING
+
+ทำไมเราต้องแยกโมเดลให้ Agent แต่ละตัว? เหตุผลคือเพื่อความฉลาดสูงสุดในจุดที่จำเป็น และช่วยเซฟคอสต์ในจุดที่เป็นงานซ้ำๆ ครับ เราเลยจับคู่โมเดลให้เหมาะกับเนื้องาน (Task) ตามตารางนี้ครับ:
 
 | Agent Alias | Assigned Role | Target LLM Model | Core Reasoning Focus |
 | :--- | :--- | :--- | :--- |
-| **`orchestrator`** | Core Transaction Manager | **Claude 4.6 Opus** | การคิดเชิงตรรกะและการหั่นสถาปัตยกรรมแผนงานภาพใหญ่ |
-| **`coder`** | Isolated Atomic Developer | **GPT-5.5 Medium** | ความสมดุลและความแม่นยำในการเขียน Functional Patch |
-| **`reviewer`** | Quality & Security Gatekeeper | **Claude 4.6 Sonnet** | การจับผิดช่องโหว่ Security และการทำ Static Code Audit |
-| **`devops`** | Pipeline & CLI Executor | **Gemini 3.5 Flash Medium** | ความเร็วระดับมิลลิวินาทีและการประหยัดต้นทุนในงาน CLI |
+| **orchestrator** | ผู้คุมทรานแซกชัน | Claude 4.6 Opus | ใช้ตัวท็อปสุด เพราะต้องคิดตรรกะซับซ้อนในการหั่นแผนงานใหญ่ |
+| **developer** | ช่างเขียนโค้ดเฉพาะจุด | GPT-5.5 Medium | ใช้โมเดลสายโค้ดที่แม่นยำและเขียน Functional Patch ได้นิ่ง |
+| **reviewer** | คนตรวจโค้ดและ Security | Claude 4.6 Sonnet | ตัวนี้เด่นเรื่องการทำ Code Audit และจับช่องโหว่ Security |
+| **devops** | คนรันคำสั่ง CLI และบอร์ด | Gemini 3.5 Flash Medium | เน้นความเร็วระดับเสี้ยววินาทีและราคาถูก เพราะเอาไว้รัน Git CLI |
 
 ---
 
-## 3. 🔄 Execution Workflow Lifecycle
+## 03 / EXECUTION WORKFLOW LIFECYCLE
 
-กระบวนการรันงานถูกควบคุมในลักษณะ **State Machine แบบปิด (Synchronous Loop)** ซึ่งทำงานร่วมกันเป็นทอด ๆ ดังนี้:
+ลองมาดูเส้นทางการเดินทางของงานในระบบกันครับ มันจะวิ่งเป็นลูปวงกลมแบบปิด (Synchronous Loop) ทีละงาน ไม่มีการรันแซงกันเด็ดขาด:
 
-1. **Phase 1: Planning & Lock State** – `orchestrator` อ่านแผนใหญ่ ล็อกสถานะระบบไม่ให้งานอื่นแทรก และตัดงานชิ้นแรกออกมาในรูปแบบ JSON Constraints
-2. **Phase 2: Environment Setup** – `devops` รับคำสั่งมาสร้างกิ่งแยกเฉพาะภารกิจผ่าน Git และปรับบอร์ดติดตามให้มนุษย์รับทราบสถานะแบบเรียลไทม์
-3. **Phase 3: Development & Isolation** – `coder` นำโจทย์ไปเขียนโค้ด หากพบว่าต้องแก้ส่วนอื่นนอกเหนือข้อตกลงจะหยุดงานทันทีเพื่อส่งสัญญาณแจ้งข้อจำกัด
-4. **Phase 4: Verification Gate** – `devops` ทำการผลักโค้ดและเปิด PR เพื่อเชิญ `reviewer` เข้ามารันสคริปต์ตรวจสอบความปลอดภัยอย่างละเอียด
-5. **Phase 5: Finalization & Squash** – เมื่อได้รับการอนุมัติ `devops` จะรันกระบวนการ **Squash and Merge** ยุบรวม Commit ย่อย ๆ ทั้งหมดให้เหลือเพียง 1 Commit เพื่อรักษาประวัติสายโค้ดให้สะอาด และย้ายการ์ดเป็น Done ก่อนที่ `orchestrator` จะคลายล็อกเพื่อรัน Task ถัดไป
-
----
-
-## 🔀 4. Data Payload Specifications (Inter-Agent Protocols)
-
-การสื่อสารระหว่าง Agent บนระบบไร้รอยต่อผ่านโครงสร้างข้อมูล JSON ที่เข้มงวดเพื่อล็อกขอบเขตของทรานแซกชัน:
-
-### Payload A: Orchestrator ➔ DevOps & Coder (Task Ingestion)
-```json
-{
-  "transaction_id": "TX-20260530-089",
-  "task_id": "TSK-402",
-  "meta": {
-    "estimated_duration_minutes": 15,
-    "priority": "HIGH"
-  },
-  "constraints": {
-    "target_files": ["src/middleware/auth.ts"],
-    "max_lines_added": 50,
-    "forbidden_keywords": ["DROP", "ALTER", "DELETE"]
-  },
-  "instruction": "Implement validateSubScopeJwt middleware to verify fine-grained scopes from the incoming JWT payload array."
-}
-```
-
-### Payload B: Coder ➔ DevOps (Artifact Delivery)
-```json
-{
-  "transaction_id": "TX-20260530-089",
-  "task_id": "TSK-402",
-  "status": "COMPLETED",
-  "artifacts": {
-    "modified_files": ["src/middleware/auth.ts"],
-    "lines_added": 24,
-    "lines_deleted": 2,
-    "patch_diff": "@@ -10,4 +10,24 @@ ... +export const validateSubScopeJwt = ..."
-  }
-}
-```
-
-### Payload C: Reviewer ➔ DevOps & Orchestrator (Verdict Audit)
-```json
-{
-  "transaction_id": "TX-20260530-089",
-  "audit_results": {
-    "static_analysis": "PASSED",
-    "security_vulnerability_scan": "CLEAN",
-    "scope_leak_check": "VALIDATED_NO_LEAK"
-  },
-  "verdict": "APPROVED",
-  "review_comments": []
-}
-```
-
----
-
-## 🛡️ 5. Deep Exception & Rollback Handling
-
-ระบบได้รับการออกแบบด้วยสถาปัตยกรรม Fault-Tolerant เพื่อป้องกันไม่ให้โครงสร้างซอร์สโค้ดและระบบฐานข้อมูลเสียหายโดยอัตโนมัติ:
-
-* **Scope Leakage Invalidation:** หาก `coder` แอบแก้ไขโค้ดหรือไฟล์นอกเหนือโครงสร้างอาเรย์ `target_files` ตัว `reviewer` จะทำการดักตรวจจับเจอทันทีตั้งแต่ขั้นตอนแกะ Git Diff และบังคับตีกลับสถานะเป็น `REJECTED` พร้อมบล็อกไม่ให้ประมวลผลการทำงานขั้นต่อไป
-* **Circuit Breaker Loop Interceptor:** หากระบบคิวงานย่อยเกิดการแก้ไขและรีวิวโค้ดวนลูปแล้วเกิดข้อผิดพลาดซ้ำเดิม (Reject) ติดต่อกันครบ **3 รอบ** ตัว `orchestrator` จะสั่งปรับสถานะโครงสร้างงานเป็น `SUSPEND` หยุดชะงักการประมวลผลทันที และยิง Alert แจ้งเตือนไปยังมนุษย์เพื่อแก้ปัญหาความล่าช้า
-* **Force Workspace Purge:** กรณีที่ธุรกรรมล้มเหลวร้ายแรงจนต้องใช้คำสั่ง `ABORT_TRANSACTION` ตัวเอเจนท์ `devops` จะทำการเคลียร์พื้นที่สภาพแวดล้อม รันคำสั่งทำลายกิ่งย่อยขยะออกไปทั้งระบบ Local และ Remote ทันที เพื่อป้องกันโค้ดค้างสายการผลิต
-```
+```text
+[ implementation_plan.md ]
+           │
+           ▼
+┌──────────────────────┐
+│  1. ORCHESTRATOR     │ ──► แกะแผนงาน แล้วซอยเป็นงานย่อย (ห้ามแก้เกิน 2 ไฟล์ / 50 บรรทัด)
+└──────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  2. DEVOPS (Init)    │ ──► สร้างกิ่ง Git ใหม่ (subtask/*) แล้วเลื่อนการ์ดบนบอร์ดเป็น In Progress
+└──────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  3. DEVELOPER        │ ──► ลงมือแก้โค้ดเฉพาะจุดตามใบสั่ง ห้ามแอบแก้ส่วนอื่นเด็ดขาด
+└──────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  4. DEVOPS (Push)    │ ──► จัดการรัน Git Commit / Push แล้วเปิด Pull Request (PR) ให้ทันที
+└──────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  5. REVIEWER         │ ──► สแกนเข้ม 4 ชั้น (Lint -> Scope -> OWASP -> ตรวจ SQL อันตราย)
+└──────────────────────┘
+      │          │
+  APPROVED    REJECTED
+      │          │
+      ▼          ▼
+┌──────────┐ ┌──────────┐
+│  MERGE   │ │ RETRY/   │ ──► ถ้าพัง สั่งแก้ใหม่ได้ 3 ครั้ง ถ้ายังพังอีก ระบบจะตัดไฟทันที
+│  (DONE)  │ │ ROLLBACK │     หยุดงานทั้งหมดแล้วแจ้งเตือนให้มนุษย์เข้ามาดู
+└──────────┘ └──────────┘
