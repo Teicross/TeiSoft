@@ -15,7 +15,7 @@ project-root/
 ├── .codex/
 │   └── prompts/
 │       ├── orchestrator.md   # [Orchestrator] พี่ใหญ่คุมกฎ คอยหั่นงานและสลับทรานแซกชัน
-│       ├── developer.md          # [developer] ช่างเขียนโค้ดเฉพาะจุด ทำงานในกรอบปิด
+│       ├── developer.md      # [developer] ช่างเขียนโค้ดเฉพาะจุด ทำงานในกรอบปิด
 │       ├── reviewer.md       # [Reviewer] หน่วยตรวจโค้ด สแกนบั๊กและความปลอดภัยก่อนให้ผ่าน
 │       └── devops.md         # [DevOps] เด็กคุมท่อ รันพวก Git CLI และเลื่อนการ์ดบนบอร์ด
 └── codex-workflow.yaml       # ไฟล์หลักที่ใช้คุม Workflow และคอยแจกจ่ายงานให้แต่ละโมเดล
