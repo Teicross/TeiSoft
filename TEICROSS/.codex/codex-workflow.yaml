@@ -1,0 +1,67 @@
+name: AI_Micro_Task_Pipeline_Transaction_With_Multi_Model
+description: "Workflow orchestration with heterogeneous model selection per agent"
+
+model_registry:
+  high_reasoning: "anthropic/claude-4.6-opus"
+  balanced_coder: "openai/gpt-5.5-medium"
+  fast_reviewer: "anthropic/claude-4.6-sonnet"
+  efficient_cli: "google/gemini-3.5-flash-medium"
+
+topology:
+  nodes:
+    - id: orchestrator
+      name: "Plan Breakdown & Synchronization"
+      agent_prompt: ".codex/prompts/orchestrator.md"
+      model: "anthropic/claude-4.6-opus"
+      inputs:
+        - src: "implementation_plan.md"
+      action: "parse_and_split_tasks"
+
+    - id: devops_init
+      name: "Initialize Task Branch & Board"
+      agent_prompt: ".codex/prompts/devops.md"
+      model: "google/gemini-3.5-flash-medium"
+      dependencies:
+        - "orchestrator"
+      action: "git_checkout_subtask_branch"
+
+    - id: coder
+      name: "Execute Bounded Code Change"
+      agent_prompt: ".codex/prompts/coder.md"
+      model: "openai/gpt-5.5-medium"
+      dependencies:
+        - "devops_init"
+      action: "implement_atomic_logic"
+
+    - id: devops_push
+      name: "Commit, Push and Create PR"
+      agent_prompt: ".codex/prompts/devops.md"
+      model: "google/gemini-3.5-flash-medium"
+      dependencies:
+        - "coder"
+      action: "git_push_and_open_pr"
+
+    - id: reviewer
+      name: "Quality Gate & Security Audit"
+      agent_prompt: ".codex/prompts/reviewer.md"
+      model: "anthropic/claude-4.6-sonnet"
+      dependencies:
+        - "devops_push"
+      action: "evaluate_pull_request"
+
+    - id: devops_merge
+      name: "Squash Merge & Close Task"
+      agent_prompt: ".codex/prompts/devops.md"
+      model: "google/gemini-3.5-flash-medium"
+      dependencies:
+        - "reviewer"
+      action: "git_squash_merge_and_update_board"
+
+global_policies:
+  on_failure:
+    reviewer_rejected:
+      target: "coder"
+      max_retries: 3
+    retry_exhausted:
+      action: "abort_transaction_and_alert_human"
+      git_rollback: "git checkout main && git branch -D subtask/*"
